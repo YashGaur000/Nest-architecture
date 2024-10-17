@@ -1,0 +1,23 @@
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const SOLARIS_API = process.env.SOLARIS_API;
+const SOLARIS_API_KEY = process.env.SOLARIS_API_KEY;
+const SOLARIS_API_SECRET = process.env.SOLARIS_API_SECRET;
+const G_CLOUD_SOLARIS_CREDENTIALS = process.env.G_CLOUD_SOLARIS_CREDENTIALS;
+const G_CLOUD_SOLARIS_RING_ID = process.env.G_CLOUD_SOLARIS_RING_ID;
+const G_CLOUD_KMS_PROJECT_ID = 'solaris-kms';
+const G_CLOUD_KMS_LOCATION_ID = 'global';
+const G_CLOUD_KMS_KEY_VERSION = '1';
+
+export {
+  SOLARIS_API,
+  SOLARIS_API_KEY,
+  SOLARIS_API_SECRET,
+  G_CLOUD_KMS_PROJECT_ID,
+  G_CLOUD_KMS_LOCATION_ID,
+  G_CLOUD_SOLARIS_RING_ID,
+  G_CLOUD_KMS_KEY_VERSION,
+  G_CLOUD_SOLARIS_CREDENTIALS,
+};

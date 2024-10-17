@@ -1,0 +1,99 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+variables:
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+sonarcloud-check:
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - sonar-scanner
+  only:
+    - merge_requests
+    - main
+    - dev
+
+
+image: node:14.17.6
+stages:
+  - build
+  - test
+  - deploy-dev
+  - deploy-prod
+  - deploy-testing
+
+cache:
+  key: '${CI_COMMIT_REF_SLUG}'
+  paths:
+    - node_modules/
+    - dist/
+build:
+  stage: build
+  script:
+    - npm i
+    - npm run-script build
+  artifacts:
+    paths:
+      - dist/
+deploy-dev:
+  stage: deploy-dev
+  before_script:
+    - which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )
+    - which rsync || ( apt-get update -y && apt-get install rsync -y )
+    - eval $(ssh-agent -s)
+    - echo "${ID_RSA_DEV}" | tr -d '\r' | ssh-add - > /dev/null
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $DEV_SERVER_IP >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - rsync -avzh --exclude="node_modules" $CI_PROJECT_DIR/ $DEV_SERVER_USER@$DEV_SERVER_IP:/var/www/kash-backend
+    - ssh -t $DEV_SERVER_USER@$DEV_SERVER_IP "cd /var/www/kash-backend; npm i; source
+      /etc/environment; pm2 reload main --update-env"
+  only:
+    - dev
+deploy-prod:
+  stage: deploy-prod
+  before_script:
+    - which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )
+    - which rsync || ( apt-get update -y && apt-get install rsync -y )
+    - eval $(ssh-agent -s)
+    - echo "${ID_RSA_PROD}" | tr -d '\r' | ssh-add - > /dev/null
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $PROD_SERVER_IP >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - rsync -avzh --exclude="node_modules" $CI_PROJECT_DIR/ $DEV_SERVER_USER@$PROD_SERVER_IP:/var/www/kash-backend
+    - ssh -t $PROD_SERVER_USER@$PROD_SERVER_IP "cd /var/www/kash-backend; npm i; source
+      /etc/environment; pm2 reload main --update-env"
+  only:
+    - main
+deploy-testing:
+  stage: deploy-testing
+  before_script:
+    - which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )
+    - which rsync || ( apt-get update -y && apt-get install rsync -y )
+    - eval $(ssh-agent -s)
+    - echo "${ID_RSA_TEST}" | tr -d '\r' | ssh-add - > /dev/null
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $TEST_SERVER_IP >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - rsync -avzh --exclude="node_modules" $CI_PROJECT_DIR/ $TEST_SERVER_USER@$TEST_SERVER_IP:/var/www/kash-backend
+    - ssh -t $TEST_SERVER_USER@$TEST_SERVER_IP "cd /var/www/kash-backend; npm i; source
+      /etc/environment; pm2 reload main --update-env"
+  only:
+    - testing
+include:
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
